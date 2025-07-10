@@ -1,0 +1,21 @@
+---
+- name: Install requirements
+  hosts: master
+  become: true
+  any_errors_fatal: true
+  roles:
+    - install_requirements
+
+#- name: Setup master
+#  hosts: master
+#  become: true
+#  any_errors_fatal: true
+#  roles:
+#    - setup_master
+#
+#- name: Setup workers
+#  hosts: workers
+#  become: true
+#  any_errors_fatal: true
+#  roles:
+#    - setup_workers
