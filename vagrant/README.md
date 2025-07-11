@@ -1,7 +1,7 @@
 # Vagrant with VirtualBox User Guide
 
 ## Prerequisites
-Before starting, make sure you have **VirtualBox** and **Vagrant** installed on your PC.
+Before starting, make sure you have **VirtualBox** and **Vagrant** installed on your system.
 
 ### Installing VirtualBox
 To install VirtualBox, please refer to the official documentation : [VirtualBox Installation](https://www.virtualbox.org/wiki/Downloads)
@@ -47,6 +47,13 @@ Example for the master node :
 
 ```bash
 vagrant ssh master
+```
+
+## Giving access to a Virtual Machine
+To authorize a connection to an ssh_key other than vagrant, you can type the following command :
+
+```bash
+vagrant ssh <vm_name> -c "echo '<public_key_content>' >> .ssh/authorized_keys"
 ```
 
 ## Stopping Virtual Machines
