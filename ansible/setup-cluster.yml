@@ -1,6 +1,6 @@
 ---
 - name: Install requirements
-  hosts: master
+  hosts: all_nodes
   become: true
   any_errors_fatal: true
   roles:
