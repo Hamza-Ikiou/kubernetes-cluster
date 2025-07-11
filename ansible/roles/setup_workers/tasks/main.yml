@@ -1,1 +1,22 @@
 ---
+- name: Set KUBELET_EXTRA_ARGS with node IP in /etc/default/kubelet
+  copy:
+    dest: /etc/default/kubelet
+    content: "KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }}\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable and start kubelet service
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+
+- name: Generate kubeadm join command
+  command: "kubeadm token create --print-join-command"
+  register: kubeadm_join_command
+  delegate_to: master
+
+- name: Join worker to the cluster
+  command: "{{ kubeadm_join_command.stdout }}--cri-socket=unix:///var/run/cri-dockerd.sock"

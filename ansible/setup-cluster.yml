@@ -12,10 +12,10 @@
   any_errors_fatal: true
   roles:
     - setup_master
-#
-#- name: Setup workers
-#  hosts: workers
-#  become: true
-#  any_errors_fatal: true
-#  roles:
-#    - setup_workers
+
+- name: Setup workers
+  hosts: workers
+  become: true
+  any_errors_fatal: true
+  roles:
+    - setup_workers
