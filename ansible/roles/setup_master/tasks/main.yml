@@ -1,1 +1,167 @@
 ---
+- name: Install auto completion
+  apt:
+    name: bash-completion
+    state: present
+
+- name: Add kubectl autocompletion
+  lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: 'source <(kubectl completion bash)'
+    create: yes
+    state: present
+
+- name: Download Helm key
+  get_url:
+    url: https://baltocdn.com/helm/signing.asc
+    dest: /tmp/helm-signing.asc
+    mode: '0644'
+  register: download_helm_key
+  retries: 3
+  delay: 5
+  until: download_helm_key is succeeded
+
+- name: Convert Helm key to binary format
+  command: "gpg --dearmor -o /usr/share/keyrings/helm.gpg /tmp/helm-signing.asc"
+  args:
+    creates: /usr/share/keyrings/helm.gpg
+
+- name: Set Helm repository variable
+  set_fact:
+    helm_arch: "{{ (ansible_architecture == 'x86_64') | ternary('amd64', ansible_architecture) }}"
+
+- name: Add Helm apt repository
+  apt_repository:
+    repo: "deb [arch={{ helm_arch }} signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main"
+    filename: helm-stable-debian
+    state: present
+
+- name: Remove temporary key file
+  file:
+    path: /tmp/helm-signing.asc
+    state: absent
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
+- name: Install Helm and auto
+  apt:
+    name: helm
+    state: present
+
+- name: Add Helm autocompletion
+  lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: 'source <(helm completion bash)'
+    create: yes
+    state: present
+
+- name: Set KUBELET_EXTRA_ARGS with node IP in /etc/default/kubelet
+  copy:
+    dest: /etc/default/kubelet
+    content: "KUBELET_EXTRA_ARGS=--node-ip={{ ansible_host }}\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Enable and start kubelet service
+  systemd:
+    name: kubelet
+    enabled: yes
+    state: started
+
+- name: Initialize Kubernetes master node with kubeadm
+  command: >
+    kubeadm init
+    --pod-network-cidr=192.168.0.0/16
+    --cri-socket=unix:///var/run/cri-dockerd.sock
+    --apiserver-advertise-address={{ ansible_host }}
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Create .kube directory in user's home
+  file:
+    path: "/home/{{ ansible_user }}/.kube"
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0755'
+
+- name: Copy admin.conf to user's kube config
+  copy:
+    src: /etc/kubernetes/admin.conf
+    dest: "/home/{{ ansible_user }}/.kube/config"
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: '0644'
+    remote_src: yes
+
+- name: Add projectcalico Helm repo
+  kubernetes.core.helm_repository:
+    name: projectcalico
+    repo_url: https://docs.tigera.io/calico/charts
+
+- name: Install Calico with Helm
+  kubernetes.core.helm:
+    name: calico
+    chart_ref: projectcalico/tigera-operator
+    release_namespace: tigera-operator
+    kubeconfig: "/home/{{ ansible_user }}/.kube/config"
+    create_namespace: yes
+    state: present
+
+- name: Retrieve last stable ArgoCD version
+  uri:
+    url: https://raw.githubusercontent.com/argoproj/argo-cd/stable/VERSION
+    return_content: yes
+  register: argocd_version
+
+- name: Download ArgoCD binary
+  get_url:
+    url: "https://github.com/argoproj/argo-cd/releases/download/v{{ argocd_version.content | trim }}/argocd-linux-amd64"
+    dest: /tmp/argocd-linux-amd64
+    mode: '0555'
+  register: argocd_bin
+
+- name: Install ArgoCD
+  copy:
+    src: /tmp/argocd-linux-amd64
+    dest: /usr/local/bin/argocd
+    mode: '0555'
+    remote_src: yes
+
+- name: Delete temporary ArgoCD binary
+  file:
+    path: /tmp/argocd-linux-amd64
+    state: absent
+  when: argocd_bin.changed
+
+- name: Add ArgoCD autocompletion
+  lineinfile:
+    path: "/home/{{ ansible_user }}/.bashrc"
+    line: 'source <(argocd completion bash)'
+    create: yes
+    state: present
+
+- name: Retrieve latest K9s release version from GitHub
+  uri:
+    url: https://api.github.com/repos/derailed/k9s/releases/latest
+    return_content: yes
+  register: k9s_latest_release
+
+- name: Download latest K9s deb package
+  get_url:
+    url: "https://github.com/derailed/k9s/releases/download/{{ k9s_latest_release.json.tag_name }}/k9s_linux_amd64.deb"
+    dest: /tmp/k9s.deb
+    mode: '0644'
+
+- name: Install K9s deb package
+  apt:
+    deb: /tmp/k9s.deb
+    state: present
+
+- name: Remove K9s deb package
+  file:
+    path: /tmp/k9s.deb
+    state: absent

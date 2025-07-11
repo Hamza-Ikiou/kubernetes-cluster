@@ -6,12 +6,12 @@
   roles:
     - install_requirements
 
-#- name: Setup master
-#  hosts: master
-#  become: true
-#  any_errors_fatal: true
-#  roles:
-#    - setup_master
+- name: Setup master
+  hosts: master
+  become: true
+  any_errors_fatal: true
+  roles:
+    - setup_master
 #
 #- name: Setup workers
 #  hosts: workers
