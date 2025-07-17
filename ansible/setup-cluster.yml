@@ -19,3 +19,10 @@
   any_errors_fatal: true
   roles:
     - setup_workers
+
+- name: Setup applications
+  hosts: master
+  become: true
+  any_errors_fatal: true
+  roles:
+    - setup_applications
