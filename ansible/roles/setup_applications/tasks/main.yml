@@ -1,9 +1,26 @@
 ---
-- name: Copy applications directory
-  copy:
-    src: applications
-    dest: "/home/{{ ansible_user }}"
-    owner: "{{ ansible_user }}"
-    group: "{{ ansible_user }}"
-    mode: 0644
-
+- name: Install or upgrade the ArgoCD Helm release
+  kubernetes.core.helm:
+    release_name: argocd
+    release_namespace: argocd
+    create_namespace: true
+    chart_ref: "argo-cd"
+    chart_repo_url: "https://argoproj.github.io/argo-helm"
+    kubeconfig: "/home/{{ ansible_user }}/.kube/config"
+    release_values:
+      server:
+        metrics:
+          enabled: true
+        service:
+          type: LoadBalancer
+        controller:
+          metrics:
+            enabled: true
+        configs:
+          params:
+            server.insecure: true
+        ingress:
+          enabled: true
+          ingressClassName: traefik
+          hosts:
+            - argocd.web

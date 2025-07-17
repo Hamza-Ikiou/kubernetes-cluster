@@ -97,19 +97,15 @@
     mode: '0644'
     remote_src: yes
 
-- name: Add projectcalico Helm repo
-  kubernetes.core.helm_repository:
-    name: projectcalico
-    repo_url: https://docs.tigera.io/calico/charts
-
 - name: Install Calico with Helm
   kubernetes.core.helm:
-    name: calico
-    chart_ref: projectcalico/tigera-operator
+    release_name: calico
     release_namespace: tigera-operator
+    create_namespace: true
+    wait: true
+    chart_ref: "tigera-operator"
+    chart_repo_url: "https://docs.tigera.io/calico/charts"
     kubeconfig: "/home/{{ ansible_user }}/.kube/config"
-    create_namespace: yes
-    state: present
 
 - name: Retrieve last stable ArgoCD version
   uri:
