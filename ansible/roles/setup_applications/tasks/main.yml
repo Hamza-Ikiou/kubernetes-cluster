@@ -24,3 +24,107 @@
           ingressClassName: traefik
           hosts:
             - argocd.web
+
+- name: Get exposed nodePort for ArgoCD server
+  shell: KUBECONFIG=/home/{{ ansible_user }}/.kube/config kubectl get svc argocd-server -n argocd -o jsonpath="{.spec.ports[?(@.port==80)].nodePort}"
+  register: argocd_node_port
+  no_log: true
+  changed_when: false
+
+- name: Get initial admin password of ArgoCD
+  shell: KUBECONFIG=/home/{{ ansible_user }}/.kube/config kubectl get secret argocd-initial-admin-secret -n argocd -o jsonpath="{.data.password}" | base64 -d
+  register: argocd_admin_password
+  no_log: true
+  changed_when: false
+
+- name: Build ArgoCD API URL
+  set_fact:
+    argocd_api_url: "https://{{ hostvars['master'].ansible_host }}:{{ argocd_node_port.stdout }}"
+
+- name: Get ArgoCD authentication token via API
+  uri:
+    url: "{{ argocd_api_url }}/api/v1/session"
+    method: POST
+    body_format: json
+    body:
+      username: "admin"
+      password: "{{ argocd_admin_password.stdout }}"
+    return_content: yes
+    validate_certs: false
+  register: argocd_token_response
+  no_log: true
+
+- name: Build ArgoCD API token
+  set_fact:
+    argocd_api_token: "{{ argocd_token_response.json.token }}"
+
+- name: Create and auto-sync ArgoCD application metallb
+  uri:
+    url: "{{ argocd_api_url }}/api/v1/applications"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ argocd_api_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      metadata:
+        name: metallb
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          repoURL: "git@github.com:Hamza-Ikiou/argocd-applications.git"
+          path: "helm-charts/metallb"
+          targetRevision: "main"
+          helm:
+            valueFiles:
+              - values.yaml
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: metallb-system
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          syncOptions:
+            - Validate=true
+            - CreateNamespace=true
+            - PrunePropagationPolicy=foreground
+            - PruneLast=true
+    validate_certs: false
+    status_code: [200, 201]
+  no_log: true
+
+- name: Create and auto-sync ArgoCD application metallb-config
+  uri:
+    url: "{{ argocd_api_url }}/api/v1/applications"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ argocd_api_token }}"
+      Content-Type: "application/json"
+    body_format: json
+    body:
+      metadata:
+        name: metallb-config
+        namespace: argocd
+      spec:
+        project: default
+        source:
+          repoURL: "git@github.com:Hamza-Ikiou/argocd-applications.git"
+          path: "helm-charts/metallb/config"
+          targetRevision: "main"
+        destination:
+          server: "https://kubernetes.default.svc"
+          namespace: metallb-system
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          syncOptions:
+            - Validate=true
+            - CreateNamespace=true
+            - PrunePropagationPolicy=foreground
+            - PruneLast=true
+    validate_certs: false
+    status_code: [200, 201]
+  no_log: true
