@@ -13,6 +13,7 @@
           enabled: true
         service:
           type: LoadBalancer
+          loadBalancerIP: 192.168.56.100
         controller:
           metrics:
             enabled: true
@@ -58,7 +59,7 @@
   set_fact:
     argocd_api_token: "{{ argocd_token_response.json.token }}"
 
-- name: Create and auto-sync ArgoCD application metallb
+- name: Create an ArgoCD app of apps
   uri:
     url: "{{ argocd_api_url }}/api/v1/applications"
     method: POST
@@ -68,20 +69,19 @@
     body_format: json
     body:
       metadata:
-        name: metallb
+        name: app-of-apps
         namespace: argocd
       spec:
         project: default
         source:
-          repoURL: "git@github.com:Hamza-Ikiou/argocd-applications.git"
-          path: "helm-charts/metallb"
+          repoURL: "https://github.com/Hamza-Ikiou/argocd-applications.git"
+          path: "applications"
           targetRevision: "main"
-          helm:
-            valueFiles:
-              - values.yaml
+          directory:
+            recurse: true
         destination:
           server: "https://kubernetes.default.svc"
-          namespace: metallb-system
+          namespace: argocd
         syncPolicy:
           automated:
             prune: true
@@ -93,75 +93,3 @@
             - PruneLast=true
     validate_certs: false
     status_code: [200, 201]
-  no_log: true
-
-- name: Create and auto-sync ArgoCD application metallb-config
-  uri:
-    url: "{{ argocd_api_url }}/api/v1/applications"
-    method: POST
-    headers:
-      Authorization: "Bearer {{ argocd_api_token }}"
-      Content-Type: "application/json"
-    body_format: json
-    body:
-      metadata:
-        name: metallb-config
-        namespace: argocd
-      spec:
-        project: default
-        source:
-          repoURL: "git@github.com:Hamza-Ikiou/argocd-applications.git"
-          path: "helm-charts/metallb/config"
-          targetRevision: "main"
-        destination:
-          server: "https://kubernetes.default.svc"
-          namespace: metallb-system
-        syncPolicy:
-          automated:
-            prune: true
-            selfHeal: true
-          syncOptions:
-            - Validate=true
-            - CreateNamespace=true
-            - PrunePropagationPolicy=foreground
-            - PruneLast=true
-    validate_certs: false
-    status_code: [200, 201]
-  no_log: true
-
-- name: Create and auto-sync ArgoCD application traefik
-  uri:
-    url: "{{ argocd_api_url }}/api/v1/applications"
-    method: POST
-    headers:
-      Authorization: "Bearer {{ argocd_api_token }}"
-      Content-Type: "application/json"
-    body_format: json
-    body:
-      metadata:
-        name: traefik
-        namespace: argocd
-      spec:
-        project: default
-        source:
-          repoURL: "git@github.com:Hamza-Ikiou/argocd-applications.git"
-          path: "helm-charts/traefik"
-          targetRevision: "main"
-          helm:
-            valueFiles:
-              - values.yaml
-        destination:
-          server: "https://kubernetes.default.svc"
-          namespace: traefik
-        syncPolicy:
-          automated:
-            prune: true
-            selfHeal: true
-          syncOptions:
-            - Validate=true
-            - CreateNamespace=true
-            - PrunePropagationPolicy=foreground
-            - PruneLast=true
-    validate_certs: false
-    status_code: [200, 201]
-  no_log: true
