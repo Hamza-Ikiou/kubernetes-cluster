@@ -26,6 +26,12 @@
           hosts:
             - argocd.web
 
+- name: Wait for all ArgoCD pods to be Ready
+  shell: KUBECONFIG=/home/{{ ansible_user }}/.kube/config kubectl wait --namespace=argocd --for=condition=Ready pod --all --timeout=180s
+  register: argocd_pods_ready
+  until: argocd_pods_ready.rc == 0
+  changed_when: false
+
 - name: Get exposed nodePort for ArgoCD server
   shell: KUBECONFIG=/home/{{ ansible_user }}/.kube/config kubectl get svc argocd-server -n argocd -o jsonpath="{.spec.ports[?(@.port==80)].nodePort}"
   register: argocd_node_port
